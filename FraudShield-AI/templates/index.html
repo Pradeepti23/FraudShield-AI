@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="home-container">
+
+    <h1 class="welcome">
+        🛡️FraudShield-AI
+    </h1>
+
+    <p class="subtitle">
+        AI-powered Credit Card Fraud Detection System that identifies suspicious transactions and provides risk analysis in real time.
+    </p>
+
+    <!-- BUTTONS -->
+    <div class="button-group">
+
+        <a href="/predict" class="primary-btn">
+            Start Prediction
+        </a>
+
+        <a href="/dashboard" class="secondary-btn">
+            View Dashboard
+        </a>
+
+    </div>
+
+    <!-- INFO BOX -->
+    <div class="info-box">
+
+        <h3>Features</h3>
+
+        <ul>
+            <li>Real-time fraud detection using Machine Learning</li>
+            <li>Random Forest and XGBoost models</li>
+            <li>Risk score and probability analysis</li>
+            <li>Transaction history tracking with SQLite database</li>
+            <li>Interactive analytics dashboard</li>
+            <li>Automatic transaction logging and monitoring</li>
+        </ul>
+
+    </div>
+
+</div>
+
+{% endblock %}

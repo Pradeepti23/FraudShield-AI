@@ -1,0 +1,171 @@
+# ==========================================================
+# FRAUDSHIELD-AI
+# Random Forest + XGBoost Training
+# ==========================================================
+
+import pandas as pd
+import joblib
+import os
+
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.ensemble import RandomForestClassifier
+from xgboost import XGBClassifier
+
+from sklearn.metrics import (
+    accuracy_score,
+    classification_report,
+    confusion_matrix,
+    roc_auc_score
+)
+
+# ==========================================================
+# CREATE MODEL DIRECTORY
+# ==========================================================
+os.makedirs("model", exist_ok=True)
+
+# ==========================================================
+# LOAD DATASET
+# ==========================================================
+df = pd.read_csv(r"C:\Users\HP\Downloads\credit_card_fraud_dataset_10000.csv")
+
+# ==========================================================
+# CLEANING
+# ==========================================================
+df.drop_duplicates(inplace=True)
+df.dropna(inplace=True)
+
+# ==========================================================
+# FEATURE ENGINEERING
+# ==========================================================
+df["amount_category"] = pd.cut(
+    df["transaction_amount"],
+    bins=[0, 1000, 10000, 50000, 100000],
+    labels=["Low", "Medium", "High", "Very_High"]
+)
+
+df["high_amount_flag"] = (df["transaction_amount"] > 50000).astype(int)
+df["high_frequency_flag"] = (df["transactions_today"] > 10).astype(int)
+df["new_device_risk"] = (df["new_device_used"] == "Yes").astype(int)
+df["international_risk"] = (df["international_transaction"] == "Yes").astype(int)
+df["location_risk"] = (df["location_match"] == "No").astype(int)
+df["history_risk"] = (df["previous_fraud_history"] == "Yes").astype(int)
+
+df["risk_score"] = (
+    df["high_amount_flag"]
+    + df["high_frequency_flag"]
+    + df["new_device_risk"]
+    + df["international_risk"]
+    + df["location_risk"]
+    + df["history_risk"]
+)
+
+# ==========================================================
+# LABEL ENCODING
+# ==========================================================
+categorical_columns = [
+    "transaction_type",
+    "merchant_category",
+    "transaction_time",
+    "previous_fraud_history",
+    "new_device_used",
+    "international_transaction",
+    "location_match",
+    "amount_category"
+]
+
+encoders = {}
+
+for col in categorical_columns:
+    le = LabelEncoder()
+    df[col] = le.fit_transform(df[col])
+    encoders[col] = le
+
+joblib.dump(encoders, "model/label_encoders.pkl")
+
+# ==========================================================
+# FEATURES & TARGET
+# ==========================================================
+X = df.drop("fraud_label", axis=1)
+y = df["fraud_label"]
+
+# ==========================================================
+# TRAIN TEST SPLIT
+# ==========================================================
+X_train, X_test, y_train, y_test = train_test_split(
+    X,
+    y,
+    test_size=0.20,
+    random_state=42,
+    stratify=y
+)
+
+# ==========================================================
+# SCALING
+# ==========================================================
+scaler = StandardScaler()
+
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+joblib.dump(scaler, "model/scaler.pkl")
+
+# ==========================================================
+# RANDOM FOREST MODEL
+# ==========================================================
+rf_model = RandomForestClassifier(
+    n_estimators=300,
+    max_depth=12,
+    random_state=42
+)
+
+rf_model.fit(X_train_scaled, y_train)
+
+rf_pred = rf_model.predict(X_test_scaled)
+rf_proba = rf_model.predict_proba(X_test_scaled)[:, 1]
+
+# ==========================================================
+# XGBOOST MODEL
+# ==========================================================
+xgb_model = XGBClassifier(
+    n_estimators=300,
+    learning_rate=0.05,
+    max_depth=8,
+    eval_metric="logloss",
+    random_state=42
+)
+
+xgb_model.fit(X_train_scaled, y_train)
+
+xgb_pred = xgb_model.predict(X_test_scaled)
+xgb_proba = xgb_model.predict_proba(X_test_scaled)[:, 1]
+
+# ==========================================================
+# EVALUATION FUNCTION
+# ==========================================================
+def evaluate(name, y_true, pred, proba):
+    print("\n", "="*50)
+    print(name)
+    print("="*50)
+    print("Accuracy :", accuracy_score(y_true, pred))
+    print("ROC AUC  :", roc_auc_score(y_true, proba))
+    print("\nConfusion Matrix")
+    print(confusion_matrix(y_true, pred))
+    print("\nClassification Report")
+    print(classification_report(y_true, pred))
+
+
+# ==========================================================
+# RESULTS
+# ==========================================================
+evaluate("RANDOM FOREST", y_test, rf_pred, rf_proba)
+evaluate("XGBOOST", y_test, xgb_pred, xgb_proba)
+
+# ==========================================================
+# SAVE MODELS
+# ==========================================================
+joblib.dump(rf_model, "model/random_forest_fraud.pkl")
+joblib.dump(xgb_model, "model/xgboost_fraud.pkl")
+
+print("\n✅ Training Completed Successfully")
+print("✅ Models Saved in model/ Folder")
